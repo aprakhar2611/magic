@@ -74,20 +74,23 @@ contains
       &    runHours,runMinutes,runSeconds,map_function,     &
       &    cacheblock_size_in_B,anelastic_flavour,          &
       &    radial_scheme,polo_flow_eq, time_scheme,         &
-      &    mpi_transp,l_adv_curl,mpi_packing
+      &    mpi_transp,l_adv_curl,mpi_packing,               &
+      &    l_P_normalize_T, l_P_normalize_rho,              &  !Prakhar
+      &    l_P_normalize_rgrav, l_P_normalize_alpha            !Prakhar
 
-      namelist/phys_param/                                        &
-      &    ra,raxi,pr,sc,prmag,ek,epsc0,epscxi0,radratio,Bn,      &
-      &    ktops,kbots,ktopv,kbotv,ktopb,kbotb,kbotxi,ktopxi,     &
-      &    s_top,s_bot,impS,sCMB,xi_top,xi_bot,impXi,xiCMB,       &
-      &    nVarCond,con_DecRate,con_RadRatio,con_LambdaMatch,     &
-      &    con_LambdaOut,con_FuncWidth,ThExpNb,GrunNb,            &
-      &    strat,polind,DissNb,g0,g1,g2,r_cut_model,thickStrat,   &
-      &    epsS,slopeStrat,rStrat,ampStrat,                       &
-      &    r_LCR,nVarDiff,nVarVisc,difExp,nVarEps,interior_model, &
-      &    nVarEntropyGrad,l_isothermal,ktopp,po,prec_angle,      &
-      &    dilution_fac,stef,tmelt,phaseDiffFac,penaltyFac,       &
-      &    epsPhase,ktopphi,kbotphi,ampForce
+      namelist/phys_param/                                     &
+      &    ra,raxi,pr,sc,prmag,ek,epsc0,epscxi0,radratio,Bn,   &
+      &    ktops,kbots,ktopv,kbotv,ktopb,kbotb,kbotxi,ktopxi,  &
+      &    s_top,s_bot,impS,sCMB,xi_top,xi_bot,impXi,xiCMB,    &
+      &    nVarCond,con_DecRate,con_RadRatio,con_LambdaMatch,  &
+      &    con_LambdaOut,con_FuncWidth,ThExpNb,GrunNb,         &
+      &    strat,polind,DissNb,g0,g1,g2,r_cut_model,thickStrat,&
+      &    epsS,slopeStrat,rStrat,ampStrat,cmbHflux,r_LCR,     &
+      &    nVarDiff,nVarVisc,difExp,nVarEps,interior_model,    &
+      &    nVarEntropyGrad,l_isothermal,ktopp,po,prec_angle,   &
+      &    dilution_fac,stef,tmelt,phaseDiffFac,penaltyFac,    &
+      &    epsPhase,ktopphi,kbotphi,ampForce, P_ec1, P_ec2,    &  !Prakhar 
+      &    P_gamma                                                !Prakhar
 
       namelist/B_external/                                     &
       &    rrMP,amp_imp,expo_imp,bmax_imp,n_imp,l_imp,         &
@@ -134,8 +137,7 @@ contains
       &    omega_ma1,omegaOsz_ma1,tShift_ma1,             &
       &    omega_ma2,omegaOsz_ma2,tShift_ma2,             &
       &    amp_mode_ma,omega_mode_ma,m_mode_ma,           &
-      &    mode_symm_ma,ellipticity_cmb, amp_tide,        &
-      &    omega_tide
+      &    mode_symm_ma,ellipticity_cmb
 
       namelist/inner_core/sigma_ratio,nRotIc,rho_ratio_ic, &
       &    omega_ic1,omegaOsz_ic1,tShift_ic1,              &
@@ -144,8 +146,14 @@ contains
       &    mode_symm_ic,ellipticity_icb,gammatau_gravi
 
 
-      sCMB(:)   =0.0_cp
-      xiCMB(:)  =0.0_cp
+      do n=1,4*n_impS_max
+         sCMB(n)=0.0_cp
+      end do
+
+      do n=1,4*n_impXi_max
+         xiCMB(n)=0.0_cp
+      end do
+
       runHours  =0
       runMinutes=0
       runSeconds=0
@@ -742,10 +750,6 @@ contains
       l_AM=l_AM .or. l_correct_AMe .or. l_correct_AMz
       l_AM=l_AM .or. l_power
 
-      ! Radial flow BC?
-      if (ellipticity_cmb /= 0.0_cp .or. ellipticity_icb /= 0.0_cp .or. &
-      &   amp_tide /=0.0_cp ) l_radial_flow_bc=.true.
-
       !-- Heat boundary condition
       if ( impS /= 0 ) then
          rad=pi/180
@@ -947,34 +951,12 @@ contains
       write(n_out,'(''  ThExpNb         ='',ES14.6,'','')') ThExpNb
       !write(n_out,'(''  GrunNb          ='',ES14.6,'','')') GrunNb
       write(n_out,'(''  epsS            ='',ES14.6,'','')') epsS
-      write(n_out,'("  ampStrat        =")',advance="no")
-      do i=1,size(ampStrat)
-         if ( ampStrat(i) > 0.0_cp ) &
-         &  write(n_out,'(1p,ES14.6,'','')',advance="no") ampStrat(i)
-      end do
-      write(n_out,*) ""
-
-      write(n_out,'("  rStrat          =")',advance="no")
-      do i=1,size(ampStrat)
-         if ( ampStrat(i) > 0.0_cp ) &
-         &  write(n_out,'(1p,ES14.6,'','')',advance="no") rStrat(i)
-      end do
-      write(n_out,*) ""
-
-      write(n_out,'("  thickStrat      =")',advance="no")
-      do i=1,size(ampStrat)
-         if ( ampStrat(i) > 0.0_cp ) &
-         &  write(n_out,'(1p,ES14.6,'','')',advance="no") thickStrat(i)
-      end do
-      write(n_out,*) ""
-
-      write(n_out,'("  slopeStrat      =")',advance="no")
-      do i=1,size(ampStrat)
-         if ( ampStrat(i) > 0.0_cp ) &
-         &  write(n_out,'(1p,ES14.6,'','')',advance="no") slopeStrat(i)
-      end do
-      write(n_out,*) ""
-
+      write(n_out,'(''  cmbHflux        ='',ES14.6,'','')') cmbHflux
+      write(n_out,'(''  slopeStrat      ='',ES14.6,'','')') slopeStrat
+      write(n_out,'(''  rStrat          ='',ES14.6,'','')') rStrat
+      write(n_out,'(''  ampStrat        ='',ES14.6,'','')') ampStrat
+      write(n_out,'(''  thickStrat      ='',ES14.6,'','')') thickStrat
+      write(n_out,'(''  nVarEntropyGrad ='',i3,'','')') nVarEntropyGrad
       write(n_out,'(''  radratio        ='',ES14.6,'','')') radratio
       write(n_out,'(''  l_isothermal    ='',l3,'','')') l_isothermal
       write(n_out,'(''  phaseDiffFac    ='',ES14.6,'','')') phaseDiffFac
@@ -1250,8 +1232,6 @@ contains
       write(n_out,'(''  m_mode_ma       ='',i4,'','')')  m_mode_ma
       write(n_out,'(''  mode_symm_ma    ='',i4,'','')')  mode_symm_ma
       write(n_out,'(''  ellipticity_cmb ='',ES14.6,'','')') ellipticity_cmb
-      write(n_out,'(''  amp_tide        ='',ES14.6,'','')') amp_tide
-      write(n_out,'(''  omega_tide      ='',ES14.6,'','')') omega_tide
       write(n_out,*) "/"
 
       write(n_out,*) "&inner_core"
@@ -1281,6 +1261,9 @@ contains
       !  Purpose of this subroutine is to set default parameters
       !  for the namelists.
       !
+
+      !-- Local variable:
+      integer :: n
 
       !----- Namelist grid
       ! must be of form 4*integer+1
@@ -1383,8 +1366,6 @@ contains
       radratio    =0.35_cp
       dilution_fac=0.0_cp    ! centrifugal acceleration
       ampForce    =0.0_cp    ! External body force amplitude
-      amp_tide    =0.0_cp    ! Amplitude of tide
-      omega_tide  =0.0_cp    ! Frequency of tide
 
       !-- Phase field
       tmelt       =0.0_cp    ! Melting temperature
@@ -1402,14 +1383,11 @@ contains
       r_cut_model=0.98_cp    ! outer radius when using interior model
       !----- Stably stratified layer
       epsS       =0.0_cp
-      slopeStrat(1) =20.0_cp
-      slopeStrat(2:)=0.0_cp
-      rStrat(1)     =1.3_cp
-      rStrat(2:)    =0.0_cp
-      ampStrat(1)   =10.0_cp
-      ampStrat(2:)  =0.0_cp
-      thickStrat(1) =0.1_cp
-      thickStrat(2:)=0.0_cp
+      cmbHflux   =0.0_cp
+      slopeStrat =20.0_cp
+      rStrat     =1.3_cp
+      ampStrat   =10.0_cp
+      thickStrat =0.1_cp
       nVarEntropyGrad=0
       !----- Gravity parameters: defaut value g propto r (i.e. g1=1)
       g0         =0.0_cp
@@ -1425,20 +1403,28 @@ contains
       ktopb      =1
       kbotb      =1
       ktopp      =1
-      s_top(:)   =0.0_cp
-      s_bot(:)   =0.0_cp
+      do n=1,4*n_s_bounds
+         s_top(n)=0.0_cp
+         s_bot(n)=0.0_cp
+      end do
       impS=0
-      peakS(:)   =0.0_cp
-      thetaS(:)  =0.0_cp
-      phiS(:)    =0.0_cp
-      widthS(:)  =0.0_cp
-      xi_top(:)  =0.0_cp
-      xi_bot(:)  =0.0_cp
+      do n=1,n_impS_max
+         peakS(n) =0.0_cp
+         thetaS(n)=0.0_cp
+         phiS(n)  =0.0_cp
+         widthS(n)=0.0_cp
+      end do
+      do n=1,4*n_xi_bounds
+         xi_top(n)=0.0_cp
+         xi_bot(n)=0.0_cp
+      end do
       impXi=0
-      peakXi(:)  =0.0_cp
-      thetaXi(:) =0.0_cp
-      phiXi(:)   =0.0_cp
-      widthXi(:) =0.0_cp
+      do n=1,n_impXi_max
+         peakXi(n) =0.0_cp
+         thetaXi(n)=0.0_cp
+         phiXi(n)  =0.0_cp
+         widthXi(n)=0.0_cp
+      end do
       ktopphi    =1
       kbotphi    =1
 
@@ -1559,7 +1545,9 @@ contains
       l_r_fieldXi   =.false.
       l_max_r       =l_max
       n_r_step      =2
-      n_r_array(:)  =0
+      do n=1,size(n_r_array)
+         n_r_array(n)=0
+      end do
       n_r_field_step =0
       n_r_fields     =0
       t_r_field_start=0.0_cp
@@ -1583,7 +1571,9 @@ contains
       t_movie_start =0.0_cp
       t_movie_stop  =0.0_cp
       dt_movie      =0.0_cp
-      movie(:)      =' '
+      do n=1,n_movies_max
+         movie(n)=' '
+      end do
       r_surface     =2.8209_cp    ! in units of (r_cmb-r_icb)
 
       !----- Output from probes:
@@ -1684,7 +1674,15 @@ contains
       mode_symm_ic   =0         ! default symmetry -> eq antisymmetric
       ellipticity_icb=0.0_cp    ! default is sphere
       gammatau_gravi =0.0_cp    ! default is no gravitationnal coupling
-
+      
+      !---- Added by Prakhar
+      l_P_normalize_T     = .true.
+      l_P_normalize_rho   = .true.
+      l_P_normalize_rgrav = .true.
+      l_P_normalize_alpha = .true.
+      P_gamma             = 1.35_cp
+      P_ec1               = 1.148_cp !Prakhar- Will have to change because it's not correct for earth
+      P_ec2               = 0.237_cp !Prakhar- Will have to change because it's not correct for earth
    end subroutine defaultNamelists
 !------------------------------------------------------------------------------
    subroutine select_tscheme(scheme_name, tscheme)
