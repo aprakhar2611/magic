@@ -103,6 +103,11 @@ module logic
    logical :: l_scramble_theta ! A flag to set theta scrambling
    logical :: l_geosMovie ! A flag to trigger the production of geos movies
    logical :: l_phaseMovie ! A flag to trigger the production of a movie for the melting radius
-   logical :: l_dtphaseMovie ! A flag to trigger the production of a movie for the temperature gradient at the melting radius
-
+   
+   ! added by Prakhar to decide whether to normalize the background profiles or
+   ! not default should be set to true
+   logical :: l_P_normalize_T 
+   logical :: l_P_normalize_rho
+   logical :: l_P_normalize_rgrav
+   logical :: l_P_normalize_alpha
 end module logic
